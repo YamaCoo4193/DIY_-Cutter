@@ -1,0 +1,151 @@
+:root {
+  font-family: 'Space Grotesk', 'Avenir Next', sans-serif;
+  color: #1d1b16;
+  background: radial-gradient(circle at 10% 20%, #fff7e7, #efead8 50%, #dcd3ba 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 1px solid #867b62;
+  background: #f3eddc;
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+input,
+select {
+  border: 1px solid #998f74;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fffdf5;
+}
+
+.page {
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.panel {
+  border: 1px solid #b2a68a;
+  border-radius: 16px;
+  background: rgba(255, 252, 243, 0.78);
+  backdrop-filter: blur(2px);
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.inline-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.card {
+  border: 1px solid #c0b59a;
+  border-radius: 12px;
+  background: #fffcf3;
+  padding: 12px;
+}
+
+.material-form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 280px;
+  margin-bottom: 12px;
+}
+
+.material-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.requirement-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.delete-row-button {
+  justify-self: start;
+}
+
+.stock-selector-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.stock-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  border: 1px solid #d1c6ac;
+  background: #faf7ee;
+}
+
+.cut-plan-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cut-plan-card {
+  overflow-x: auto;
+}
+
+.cut-plan-svg {
+  width: 100%;
+  min-width: 720px;
+  height: 144px;
+  display: block;
+}
+
+@media (max-width: 900px) {
+  .page {
+    padding: 16px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
