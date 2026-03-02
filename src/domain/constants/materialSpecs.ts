@@ -1,4 +1,4 @@
-import type { MaterialSpec } from '../../models/material';
+import type { MaterialSpec, MaterialTypeId } from '../../models/material';
 
 const FEET_TO_MM = 304.8;
 const toMm = (feet: number): number => Math.round(feet * FEET_TO_MM);
@@ -45,6 +45,6 @@ export const MATERIAL_SPECS: readonly MaterialSpec[] = [
   },
 ];
 
-export const MATERIAL_SPEC_MAP: ReadonlyMap<string, MaterialSpec> = new Map(
+export const MATERIAL_SPEC_MAP: ReadonlyMap<MaterialTypeId, MaterialSpec> = new Map(
   MATERIAL_SPECS.map((spec) => [spec.id, spec]),
 );

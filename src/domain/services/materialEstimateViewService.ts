@@ -1,7 +1,7 @@
-import { MATERIAL_SPECS } from '../constants/materialSpecs';
+import { DEFAULT_KERF_MM, MATERIAL_SPECS } from '../constants/materialSpecs';
 import type { MaterialEstimationResult, StockSelection } from './materialEstimationService';
 import type { MaterialRequirement } from '../../models/materialRequirement';
-import type { DraftRequirementSnapshot } from '../../models/materialEstimateSnapshot';
+import type { DraftRequirementSnapshot, MaterialEstimateSnapshot } from '../../models/materialEstimateSnapshot';
 import type { MaterialTypeId, StockLengthLabel } from '../../models/material';
 
 export type DraftRequirement = DraftRequirementSnapshot;
@@ -45,6 +45,50 @@ export const buildDefaultStockSelection = (): StockSelection => ({
   '2x4': getDefaultLabels('2x4'),
   cafe: getDefaultLabels('cafe'),
 });
+
+const sanitizeRequirement = (requirement: DraftRequirementSnapshot, createId: () => string): DraftRequirement => ({
+  id: requirement.id.trim().length > 0 ? requirement.id : createId(),
+  materialType: requirement.materialType,
+  lengthMmInput: requirement.lengthMmInput,
+  quantityInput: requirement.quantityInput,
+});
+
+export const sanitizeStockSelection = (
+  stockSelection: Partial<Record<MaterialTypeId, readonly StockLengthLabel[]>> | undefined,
+): StockSelection => {
+  const defaults = buildDefaultStockSelection();
+
+  return MATERIAL_SPECS.reduce<StockSelection>((selection, spec) => {
+    const allowedLabels = new Set(spec.availableLengths.map((length) => length.label));
+    const selected = stockSelection?.[spec.id] ?? defaults[spec.id];
+    const filtered = selected.filter((label) => allowedLabels.has(label));
+    return {
+      ...selection,
+      [spec.id]: filtered,
+    };
+  }, defaults);
+};
+
+export const restoreWorkspaceSnapshot = (
+  snapshot: Pick<MaterialEstimateSnapshot, 'kerfMm' | 'requirements' | 'stockSelection'>,
+  createId: () => string,
+): {
+  readonly kerfMm: number;
+  readonly requirements: readonly DraftRequirement[];
+  readonly stockSelection: StockSelection;
+} => {
+  const kerfMm = Number.isFinite(snapshot.kerfMm) ? Math.max(0, snapshot.kerfMm) : DEFAULT_KERF_MM;
+  const requirements =
+    snapshot.requirements.length > 0
+      ? snapshot.requirements.map((requirement) => sanitizeRequirement(requirement, createId))
+      : [createDraftRequirement(createId)];
+
+  return {
+    kerfMm,
+    requirements,
+    stockSelection: sanitizeStockSelection(snapshot.stockSelection),
+  };
+};
 
 export const normalizeRequirements = (requirements: readonly DraftRequirement[]): MaterialRequirement[] =>
   requirements.flatMap((item) => {

@@ -2,6 +2,7 @@ import { MATERIAL_SPECS } from '../domain/constants/materialSpecs';
 import type { DraftRequirement } from '../domain/services/materialEstimateViewService';
 import type { StockSelection } from '../domain/services/materialEstimationService';
 import type { MaterialTypeId, StockLengthLabel } from '../models/material';
+import { normalizeNumericInput } from '../utils/numericInput';
 
 type Props = {
   readonly kerfMm: number;
@@ -15,6 +16,7 @@ type Props = {
   readonly onRequirementChange: (id: string, updater: (current: DraftRequirement) => DraftRequirement) => void;
   readonly onAddRequirement: () => void;
   readonly onRemoveRequirement: (id: string) => void;
+  readonly onApplyRequirements: () => void;
 };
 
 export const MaterialInputSection = ({
@@ -29,6 +31,7 @@ export const MaterialInputSection = ({
   onRequirementChange,
   onAddRequirement,
   onRemoveRequirement,
+  onApplyRequirements,
 }: Props): JSX.Element => (
   <section className="panel">
     <h2>必要部材の入力</h2>
@@ -45,8 +48,14 @@ export const MaterialInputSection = ({
     </div>
     <label className="material-form-row">
       <span>刃厚 (mm)</span>
-      <input type="number" min={0} step={0.1} value={kerfMm} onChange={(event) => onKerfChange(Math.max(0, Number(event.target.value) || 0))} />
+      <input
+        type="text"
+        inputMode="decimal"
+        value={String(kerfMm)}
+        onChange={(event) => onKerfChange(Math.max(0, Number(normalizeNumericInput(event.target.value)) || 0))}
+      />
     </label>
+
     <div className="stock-selector-grid">
       {MATERIAL_SPECS.map((spec) => (
         <article key={spec.id} className="card">
@@ -88,23 +97,31 @@ export const MaterialInputSection = ({
           <label className="material-field">
             <span>長さ(mm)</span>
             <input
-              type="number"
-              min={0}
-              step={1}
+              type="text"
+              inputMode="numeric"
               value={item.lengthMmInput}
               placeholder="例: 1200"
-              onChange={(event) => onRequirementChange(item.id, (current) => ({ ...current, lengthMmInput: event.target.value }))}
+              onChange={(event) =>
+                onRequirementChange(item.id, (current) => ({
+                  ...current,
+                  lengthMmInput: normalizeNumericInput(event.target.value),
+                }))
+              }
             />
           </label>
           <label className="material-field">
             <span>本数</span>
             <input
-              type="number"
-              min={0}
-              step={1}
+              type="text"
+              inputMode="numeric"
               value={item.quantityInput}
               placeholder="例: 4"
-              onChange={(event) => onRequirementChange(item.id, (current) => ({ ...current, quantityInput: event.target.value }))}
+              onChange={(event) =>
+                onRequirementChange(item.id, (current) => ({
+                  ...current,
+                  quantityInput: normalizeNumericInput(event.target.value),
+                }))
+              }
             />
           </label>
           <button className="delete-row-button" type="button" onClick={() => onRemoveRequirement(item.id)} disabled={requirements.length <= 1}>
@@ -113,8 +130,13 @@ export const MaterialInputSection = ({
         </article>
       ))}
     </div>
-    <button type="button" onClick={onAddRequirement}>
-      + 行追加
-    </button>
+    <div className="input-actions">
+      <button type="button" onClick={onAddRequirement}>
+        + 行追加
+      </button>
+      <button type="button" onClick={onApplyRequirements}>
+        OK
+      </button>
+    </div>
   </section>
 );

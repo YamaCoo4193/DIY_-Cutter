@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { DEFAULT_KERF_MM } from '../domain/constants/materialSpecs';
 import { MaterialEstimationService } from '../domain/services/materialEstimationService';
 import {
   buildDefaultStockSelection,
   buildInputAggregates,
+  restoreWorkspaceSnapshot,
   buildStockAggregates,
   buildStockByMaterial,
   createDraftRequirement,
@@ -17,14 +19,16 @@ import type { MaterialTypeId, StockLengthLabel } from '../models/material';
 export const useMaterialEstimateWorkspace = () => {
   const storage = useMemo(() => new MaterialEstimateStorage(), []);
   const estimator = useMemo(() => new MaterialEstimationService(), []);
+  const initialRequirement = useMemo(() => createDraftRequirement(createId), []);
 
-  const [kerfMm, setKerfMm] = useState(3);
+  const [kerfMm, setKerfMm] = useState(DEFAULT_KERF_MM);
   const [saveName, setSaveName] = useState('');
-  const [requirements, setRequirements] = useState<readonly DraftRequirement[]>([createDraftRequirement(createId)]);
+  const [requirements, setRequirements] = useState<readonly DraftRequirement[]>([initialRequirement]);
+  const [appliedRequirements, setAppliedRequirements] = useState<readonly DraftRequirement[]>([initialRequirement]);
   const [stockSelection, setStockSelection] = useState(() => buildDefaultStockSelection());
   const [savedSnapshots, setSavedSnapshots] = useState<readonly MaterialEstimateSnapshot[]>(() => storage.loadAll());
 
-  const normalizedRequirements = useMemo(() => normalizeRequirements(requirements), [requirements]);
+  const normalizedRequirements = useMemo(() => normalizeRequirements(appliedRequirements), [appliedRequirements]);
   const result = useMemo(
     () => estimator.estimate(normalizedRequirements, kerfMm, stockSelection),
     [estimator, normalizedRequirements, kerfMm, stockSelection],
@@ -47,7 +51,16 @@ export const useMaterialEstimateWorkspace = () => {
   };
 
   const removeRequirement = (id: string): void => {
-    setRequirements((prev) => (prev.length > 1 ? prev.filter((row) => row.id !== id) : prev));
+    setRequirements((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((row) => row.id !== id);
+    });
+  };
+
+  const applyRequirements = (): void => {
+    setAppliedRequirements(
+      requirements.length > 0 ? requirements.map((row) => ({ ...row })) : [createDraftRequirement(createId)],
+    );
   };
 
   const toggleStockSelection = (materialType: MaterialTypeId, label: StockLengthLabel): void => {
@@ -77,9 +90,11 @@ export const useMaterialEstimateWorkspace = () => {
   const loadSnapshot = (id: string): void => {
     const target = savedSnapshots.find((snapshot) => snapshot.id === id);
     if (!target) return;
-    setKerfMm(target.kerfMm);
-    setRequirements(target.requirements.length > 0 ? target.requirements : [createDraftRequirement(createId)]);
-    setStockSelection(target.stockSelection);
+    const restored = restoreWorkspaceSnapshot(target, createId);
+    setKerfMm(restored.kerfMm);
+    setRequirements(restored.requirements);
+    setAppliedRequirements(restored.requirements);
+    setStockSelection(restored.stockSelection);
   };
 
   const deleteSnapshot = (id: string): void => {
@@ -97,6 +112,7 @@ export const useMaterialEstimateWorkspace = () => {
     addRequirement,
     updateRequirement,
     removeRequirement,
+    applyRequirements,
     stockSelection,
     toggleStockSelection,
     savedSnapshots,

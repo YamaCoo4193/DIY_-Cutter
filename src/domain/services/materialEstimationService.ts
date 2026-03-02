@@ -20,17 +20,6 @@ export type StockSelection = Readonly<Record<MaterialTypeId, readonly StockLengt
 const byLengthDesc = (a: CutPiece, b: CutPiece): number => b.lengthMm - a.lengthMm;
 const byStockLengthAsc = <T extends { lengthMm: number }>(a: T, b: T): number => a.lengthMm - b.lengthMm;
 
-// 規格数は少数前提なので、混在パターンの優先順を総当たりしても十分軽い。
-const permutations = <T,>(values: readonly T[]): T[][] => {
-  if (values.length <= 1) return [values.slice() as T[]];
-  const result: T[][] = [];
-  values.forEach((value, index) => {
-    const rest = values.slice(0, index).concat(values.slice(index + 1));
-    permutations(rest).forEach((tail) => result.push([value, ...tail]));
-  });
-  return result;
-};
-
 export class MaterialEstimationService {
   public estimate(requirements: readonly MaterialRequirement[], kerfMm: number, stockSelection?: StockSelection): MaterialEstimationResult {
     const safeKerfMm = Number.isFinite(kerfMm) ? Math.max(0, kerfMm) : 0;
@@ -48,7 +37,7 @@ export class MaterialEstimationService {
   }
 
   private buildSummaries(requirements: readonly MaterialRequirement[]): MaterialSummary[] {
-    const grouped = new Map<string, { totalPieces: number; totalLengthMm: number }>();
+    const grouped = new Map<MaterialTypeId, { totalPieces: number; totalLengthMm: number }>();
     requirements.forEach((item) => {
       const current = grouped.get(item.materialType) ?? { totalPieces: 0, totalLengthMm: 0 };
       grouped.set(item.materialType, {
@@ -80,7 +69,7 @@ export class MaterialEstimationService {
       .sort(byLengthDesc);
 
     const allowedStocks = spec.availableLengths
-      .filter((stock) => !selectedLabels || selectedLabels.length === 0 || selectedLabels.includes(stock.label))
+      .filter((stock) => selectedLabels === undefined || selectedLabels.includes(stock.label))
       .sort(byStockLengthAsc);
 
     if (allowedStocks.length === 0) return [];
@@ -97,8 +86,8 @@ export class MaterialEstimationService {
       if (single.length > 0) plans.push(single);
     });
 
-    // 規格を新規投入する優先順を変えると結果が変わるため、順列ごとに試算する。
-    permutations(allowedStocks).forEach((order) => {
+    // 拡張時の計算量を抑えるため、順列総当たりではなく代表的な投入順だけ比較する。
+    this.buildCandidateOrders(allowedStocks).forEach((order) => {
       const plan = this.buildPlanByCreationOrder(spec, pieces, kerfMm, order);
       if (plan.length > 0) plans.push(plan);
     });
@@ -113,6 +102,29 @@ export class MaterialEstimationService {
     });
 
     return plans[0]!;
+  }
+
+  private buildCandidateOrders(
+    allowedStocks: readonly { label: StockLengthLabel; lengthMm: number }[],
+  ): readonly (readonly { label: StockLengthLabel; lengthMm: number }[])[] {
+    if (allowedStocks.length <= 1) return [allowedStocks];
+
+    const orders = [
+      [...allowedStocks].sort(byStockLengthAsc),
+      [...allowedStocks].sort((a, b) => b.lengthMm - a.lengthMm),
+    ];
+
+    if (allowedStocks.length > 2) {
+      const middleFirst = [...allowedStocks].sort((a, b) => a.lengthMm - b.lengthMm);
+      const pivot = Math.floor(middleFirst.length / 2);
+      orders.push([...middleFirst.slice(pivot), ...middleFirst.slice(0, pivot)]);
+    }
+
+    const uniqueOrders = new Map<string, readonly { label: StockLengthLabel; lengthMm: number }[]>();
+    orders.forEach((order) => {
+      uniqueOrders.set(order.map((item) => item.label).join(','), order);
+    });
+    return Array.from(uniqueOrders.values());
   }
 
   private buildPlanByBestFitMixed(

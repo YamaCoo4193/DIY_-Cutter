@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 :root {
   font-family: 'Space Grotesk', 'Avenir Next', sans-serif;
   color: #1d1b16;
@@ -49,8 +51,13 @@ select {
 .topbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   margin-bottom: 16px;
+}
+
+.print-button {
+  white-space: nowrap;
 }
 
 .panel {
@@ -66,6 +73,11 @@ select {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.inline-group > input {
+  flex: 1 1 220px;
+  min-width: 0;
 }
 
 .cards {
@@ -122,6 +134,13 @@ select {
   background: #faf7ee;
 }
 
+.input-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
 .cut-plan-list {
   display: flex;
   flex-direction: column;
@@ -139,6 +158,62 @@ select {
   display: block;
 }
 
+@media print {
+  :root {
+    background: #fff;
+    color: #111;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  .page {
+    max-width: none;
+    padding: 0;
+  }
+
+  .print-hide {
+    display: none !important;
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  .print-section,
+  .print-section .panel {
+    display: block;
+  }
+
+  .panel {
+    border: 0;
+    background: #fff;
+    padding: 0;
+    margin: 0 0 16px;
+    backdrop-filter: none;
+  }
+
+  .card {
+    border: 1px solid #d2d2d2;
+    background: #fff;
+    break-inside: avoid;
+  }
+
+  .cut-plan-card {
+    overflow: visible;
+  }
+
+  .cut-plan-svg {
+    min-width: 0;
+    height: auto;
+  }
+
+  button {
+    display: none;
+  }
+}
+
 @media (max-width: 900px) {
   .page {
     padding: 16px;
@@ -147,5 +222,58 @@ select {
   .topbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .cards,
+  .stock-selector-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  }
+
+  .cut-plan-svg {
+    min-width: 640px;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 14px;
+  }
+
+  .panel {
+    padding: 14px;
+    margin-bottom: 14px;
+  }
+
+  .inline-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inline-group > input,
+  .inline-group > button,
+  .input-actions > button {
+    width: 100%;
+  }
+
+  .cards,
+  .stock-selector-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .material-form-row {
+    max-width: none;
+  }
+
+  .stock-checkbox {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .input-actions {
+    flex-direction: column;
+  }
+
+  .cut-plan-svg {
+    min-width: 560px;
   }
 }
