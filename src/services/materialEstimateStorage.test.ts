@@ -1,5 +1,33 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { MaterialEstimateStorage } from './materialEstimateStorage';
+import type { MaterialSpec } from '../models/material';
+
+const TEST_MATERIAL_SPECS: readonly MaterialSpec[] = [
+  {
+    id: 'custom-1x4',
+    name: '1x4',
+    widthMm: 89,
+    thicknessMm: 19,
+    color: '#f28f3b',
+    stockLength: { label: '8f', lengthMm: 2438 },
+  },
+  {
+    id: 'custom-2x4',
+    name: '2x4',
+    widthMm: 89,
+    thicknessMm: 38,
+    color: '#4d7ea8',
+    stockLength: { label: '6f', lengthMm: 1829 },
+  },
+  {
+    id: 'custom-cafe',
+    name: 'カフェ板',
+    widthMm: 200,
+    thicknessMm: 30,
+    color: '#8c6a43',
+    stockLength: { label: '4000mm', lengthMm: 4000 },
+  },
+];
 
 class MemoryStorage implements Storage {
   private readonly store = new Map<string, string>();
@@ -51,7 +79,7 @@ describe('MaterialEstimateStorage', () => {
             requirements: [
               {
                 id: 'req-1',
-                materialType: '1x4',
+                materialType: 'custom-1x4',
                 lengthMmInput: '300',
                 quantityInput: '2',
               },
@@ -63,8 +91,8 @@ describe('MaterialEstimateStorage', () => {
               },
             ],
             stockSelection: {
-              '1x4': ['8f', 'bad-label'],
-              cafe: ['4000mm'],
+              'custom-1x4': ['8f', 'bad-label'],
+              'custom-cafe': ['4000mm'],
             },
           },
         },
@@ -73,7 +101,7 @@ describe('MaterialEstimateStorage', () => {
 
     const storage = new MaterialEstimateStorage();
 
-    expect(storage.loadAll()).toEqual([
+    expect(storage.loadAll(TEST_MATERIAL_SPECS)).toEqual([
       {
         id: 'snapshot-1',
         name: 'Saved',
@@ -82,15 +110,65 @@ describe('MaterialEstimateStorage', () => {
         requirements: [
           {
             id: 'req-1',
-            materialType: '1x4',
+            materialType: 'custom-1x4',
             lengthMmInput: '300',
             quantityInput: '2',
           },
         ],
         stockSelection: {
-          '1x4': ['8f'],
-          '2x4': ['6f', '8f', '12f'],
-          cafe: ['4000mm'],
+          'custom-1x4': ['8f'],
+          'custom-2x4': ['6f'],
+          'custom-cafe': ['4000mm'],
+        },
+      },
+    ]);
+  });
+
+  it('clears missing material types while keeping the rest of the requirement row', () => {
+    localStorage.setItem(
+      'diy-cutter:material-estimates:v1',
+      JSON.stringify([
+        {
+          version: 1,
+          snapshot: {
+            id: 'snapshot-2',
+            name: 'Saved',
+            savedAt: '2026-03-02T00:00:00.000Z',
+            kerfMm: 3,
+            requirements: [
+              {
+                id: 'req-2',
+                materialType: 'missing-spec',
+                lengthMmInput: '450',
+                quantityInput: '1',
+              },
+            ],
+            stockSelection: {},
+          },
+        },
+      ]),
+    );
+
+    const storage = new MaterialEstimateStorage();
+
+    expect(storage.loadAll(TEST_MATERIAL_SPECS)).toEqual([
+      {
+        id: 'snapshot-2',
+        name: 'Saved',
+        savedAt: '2026-03-02T00:00:00.000Z',
+        kerfMm: 3,
+        requirements: [
+          {
+            id: 'req-2',
+            materialType: '',
+            lengthMmInput: '450',
+            quantityInput: '1',
+          },
+        ],
+        stockSelection: {
+          'custom-1x4': ['8f'],
+          'custom-2x4': ['6f'],
+          'custom-cafe': ['4000mm'],
         },
       },
     ]);

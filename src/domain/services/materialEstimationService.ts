@@ -1,7 +1,7 @@
 import type { CutPiece, CutPlan, MaterialSummary } from '../../models/cutPlan';
 import type { MaterialRequirement } from '../../models/materialRequirement';
 import type { MaterialSpec, MaterialTypeId, StockLengthLabel } from '../../models/material';
-import { MATERIAL_SPEC_MAP } from '../constants/materialSpecs';
+import { createMaterialSpecMap } from '../constants/materialSpecs';
 
 type Bin = {
   readonly stockLabel: StockLengthLabel;
@@ -21,10 +21,16 @@ const byLengthDesc = (a: CutPiece, b: CutPiece): number => b.lengthMm - a.length
 const byStockLengthAsc = <T extends { lengthMm: number }>(a: T, b: T): number => a.lengthMm - b.lengthMm;
 
 export class MaterialEstimationService {
-  public estimate(requirements: readonly MaterialRequirement[], kerfMm: number, stockSelection?: StockSelection): MaterialEstimationResult {
+  public estimate(
+    requirements: readonly MaterialRequirement[],
+    kerfMm: number,
+    materialSpecs: readonly MaterialSpec[],
+    stockSelection?: StockSelection,
+  ): MaterialEstimationResult {
     const safeKerfMm = Number.isFinite(kerfMm) ? Math.max(0, kerfMm) : 0;
     const normalized = requirements.filter((item) => item.lengthMm > 0 && item.quantity > 0);
-    const summaries = this.buildSummaries(normalized);
+    const materialSpecMap = createMaterialSpecMap(materialSpecs);
+    const summaries = this.buildSummaries(normalized, materialSpecMap);
     const cutPlans = summaries.flatMap((summary) =>
       this.optimizeForSpec(
         summary.materialSpec,
@@ -36,7 +42,10 @@ export class MaterialEstimationService {
     return { summaries, cutPlans };
   }
 
-  private buildSummaries(requirements: readonly MaterialRequirement[]): MaterialSummary[] {
+  private buildSummaries(
+    requirements: readonly MaterialRequirement[],
+    materialSpecMap: ReadonlyMap<MaterialTypeId, MaterialSpec>,
+  ): MaterialSummary[] {
     const grouped = new Map<MaterialTypeId, { totalPieces: number; totalLengthMm: number }>();
     requirements.forEach((item) => {
       const current = grouped.get(item.materialType) ?? { totalPieces: 0, totalLengthMm: 0 };
@@ -47,7 +56,7 @@ export class MaterialEstimationService {
     });
 
     return Array.from(grouped.entries()).flatMap(([materialType, total]) => {
-      const spec = MATERIAL_SPEC_MAP.get(materialType);
+      const spec = materialSpecMap.get(materialType);
       if (!spec) return [];
       return [{ materialSpec: spec, totalPieces: total.totalPieces, totalLengthMm: total.totalLengthMm }];
     });
@@ -68,7 +77,7 @@ export class MaterialEstimationService {
       )
       .sort(byLengthDesc);
 
-    const allowedStocks = spec.availableLengths
+    const allowedStocks = [spec.stockLength]
       .filter((stock) => selectedLabels === undefined || selectedLabels.includes(stock.label))
       .sort(byStockLengthAsc);
 

@@ -16,3 +16,9 @@ const FULLWIDTH_NUMBER_MAP: Readonly<Record<string, string>> = {
 
 export const normalizeNumericInput = (value: string): string =>
   Array.from(value).map((char) => FULLWIDTH_NUMBER_MAP[char] ?? char).join('');
+
+export const normalizeIntegerInput = (value: string): string =>
+  normalizeNumericInput(value).replace(/[^\d]/g, '');
+
+export const normalizeCommaSeparatedIntegerInput = (value: string): string =>
+  normalizeNumericInput(value).replace(/[^\d,\s]/g, '');

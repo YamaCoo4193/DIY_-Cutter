@@ -1,8 +1,8 @@
-import { DEFAULT_KERF_MM, MATERIAL_SPECS } from '../constants/materialSpecs';
+import { DEFAULT_KERF_MM } from '../constants/materialSpecs';
 import type { MaterialEstimationResult, StockSelection } from './materialEstimationService';
 import type { MaterialRequirement } from '../../models/materialRequirement';
 import type { DraftRequirementSnapshot, MaterialEstimateSnapshot } from '../../models/materialEstimateSnapshot';
-import type { MaterialTypeId, StockLengthLabel } from '../../models/material';
+import type { MaterialSpec, MaterialTypeId, StockLengthLabel } from '../../models/material';
 
 export type DraftRequirement = DraftRequirementSnapshot;
 
@@ -37,30 +37,39 @@ export const createDraftRequirement = (createId: () => string): DraftRequirement
   quantityInput: '',
 });
 
-const getDefaultLabels = (materialType: MaterialTypeId): readonly StockLengthLabel[] =>
-  MATERIAL_SPECS.find((spec) => spec.id === materialType)?.availableLengths.map((length) => length.label) ?? [];
+export const buildDefaultStockSelection = (materialSpecs: readonly MaterialSpec[]): StockSelection =>
+  materialSpecs.reduce<StockSelection>((selection, spec) => {
+    const next = [spec.stockLength.label];
+    return { ...selection, [spec.id]: next };
+  }, {});
 
-export const buildDefaultStockSelection = (): StockSelection => ({
-  '1x4': getDefaultLabels('1x4'),
-  '2x4': getDefaultLabels('2x4'),
-  cafe: getDefaultLabels('cafe'),
-});
+const sanitizeRequirement = (
+  requirement: DraftRequirementSnapshot,
+  createId: () => string,
+  materialSpecs: readonly MaterialSpec[],
+): DraftRequirement => {
+  const validMaterialTypes = new Set(materialSpecs.map((spec) => spec.id));
+  const materialType = requirement.materialType !== '' && !validMaterialTypes.has(requirement.materialType)
+    ? ''
+    : requirement.materialType;
 
-const sanitizeRequirement = (requirement: DraftRequirementSnapshot, createId: () => string): DraftRequirement => ({
-  id: requirement.id.trim().length > 0 ? requirement.id : createId(),
-  materialType: requirement.materialType,
-  lengthMmInput: requirement.lengthMmInput,
-  quantityInput: requirement.quantityInput,
-});
+  return {
+    id: requirement.id.trim().length > 0 ? requirement.id : createId(),
+    materialType,
+    lengthMmInput: requirement.lengthMmInput,
+    quantityInput: requirement.quantityInput,
+  };
+};
 
 export const sanitizeStockSelection = (
   stockSelection: Partial<Record<MaterialTypeId, readonly StockLengthLabel[]>> | undefined,
+  materialSpecs: readonly MaterialSpec[],
 ): StockSelection => {
-  const defaults = buildDefaultStockSelection();
+  const defaults = buildDefaultStockSelection(materialSpecs);
 
-  return MATERIAL_SPECS.reduce<StockSelection>((selection, spec) => {
-    const allowedLabels = new Set(spec.availableLengths.map((length) => length.label));
-    const selected = stockSelection?.[spec.id] ?? defaults[spec.id];
+  return materialSpecs.reduce<StockSelection>((selection, spec) => {
+    const allowedLabels = new Set([spec.stockLength.label]);
+    const selected = stockSelection?.[spec.id] ?? defaults[spec.id] ?? [];
     const filtered = selected.filter((label) => allowedLabels.has(label));
     return {
       ...selection,
@@ -70,8 +79,11 @@ export const sanitizeStockSelection = (
 };
 
 export const restoreWorkspaceSnapshot = (
-  snapshot: Pick<MaterialEstimateSnapshot, 'kerfMm' | 'requirements' | 'stockSelection'>,
+  snapshot: Pick<MaterialEstimateSnapshot, 'kerfMm' | 'requirements'> & {
+    readonly stockSelection?: Partial<Record<MaterialTypeId, readonly StockLengthLabel[]>>;
+  },
   createId: () => string,
+  materialSpecs: readonly MaterialSpec[],
 ): {
   readonly kerfMm: number;
   readonly requirements: readonly DraftRequirement[];
@@ -80,13 +92,13 @@ export const restoreWorkspaceSnapshot = (
   const kerfMm = Number.isFinite(snapshot.kerfMm) ? Math.max(0, snapshot.kerfMm) : DEFAULT_KERF_MM;
   const requirements =
     snapshot.requirements.length > 0
-      ? snapshot.requirements.map((requirement) => sanitizeRequirement(requirement, createId))
+      ? snapshot.requirements.map((requirement) => sanitizeRequirement(requirement, createId, materialSpecs))
       : [createDraftRequirement(createId)];
 
   return {
     kerfMm,
     requirements,
-    stockSelection: sanitizeStockSelection(snapshot.stockSelection),
+    stockSelection: sanitizeStockSelection(snapshot.stockSelection, materialSpecs),
   };
 };
 
@@ -151,39 +163,40 @@ export const buildStockAggregates = (
     if (hasAny) return;
 
     const selectedLabels = stockSelection[summary.materialSpec.id] ?? [];
-    const selectable = summary.materialSpec.availableLengths.filter((stock) => selectedLabels.includes(stock.label));
-    if (selectable.length === 0) return;
-
-    const longest = selectable.reduce((acc, current) => (current.lengthMm > acc.lengthMm ? current : acc));
+    const selectable = selectedLabels.includes(summary.materialSpec.stockLength.label) ? summary.materialSpec.stockLength : null;
+    if (!selectable) return;
     const maxPieceLength = normalizedRequirements
       .filter((item) => item.materialType === summary.materialSpec.id)
       .reduce((max, item) => Math.max(max, item.lengthMm), 0);
-    const count = Math.max(1, Math.ceil(summary.totalLengthMm / longest.lengthMm));
+    const count = Math.max(1, Math.ceil(summary.totalLengthMm / selectable.lengthMm));
 
-    grouped.set(`${summary.materialSpec.id}-${longest.label}-fallback`, {
-      key: `${summary.materialSpec.id}-${longest.label}-fallback`,
+    grouped.set(`${summary.materialSpec.id}-${selectable.label}-fallback`, {
+      key: `${summary.materialSpec.id}-${selectable.label}-fallback`,
       materialType: summary.materialSpec.id,
       materialName: summary.materialSpec.name,
-      stockLabel: longest.label,
-      stockLengthMm: longest.lengthMm,
+      stockLabel: selectable.label,
+      stockLengthMm: selectable.lengthMm,
       count,
       wasteCount: count,
-      wasteLengthsMm: [Math.max(0, count * longest.lengthMm - summary.totalLengthMm)],
-      note: maxPieceLength > longest.lengthMm ? '選択規格では収まらない部材あり' : '概算（長尺/接合を含む可能性）',
+      wasteLengthsMm: [Math.max(0, count * selectable.lengthMm - summary.totalLengthMm)],
+      note: maxPieceLength > selectable.lengthMm ? '選択規格では収まらない部材あり' : '概算（長尺/接合を含む可能性）',
     });
   });
 
   return Array.from(grouped.values());
 };
 
-export const buildInputAggregates = (normalizedRequirements: readonly MaterialRequirement[]): InputAggregate[] => {
+export const buildInputAggregates = (
+  normalizedRequirements: readonly MaterialRequirement[],
+  materialSpecs: readonly MaterialSpec[],
+): InputAggregate[] => {
   const grouped = new Map<
     MaterialTypeId,
     { materialName: string; totalPieces: number; lengths: Map<number, number> }
   >();
 
   normalizedRequirements.forEach((item) => {
-    const spec = MATERIAL_SPECS.find((candidate) => candidate.id === item.materialType);
+    const spec = materialSpecs.find((candidate) => candidate.id === item.materialType);
     const materialName = spec?.name ?? item.materialType;
     const current = grouped.get(item.materialType) ?? {
       materialName,
