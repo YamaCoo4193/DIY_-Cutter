@@ -78,6 +78,14 @@ export const MaterialEstimatePage = (): JSX.Element => {
       <header className="topbar">
         <h1 className="page-title">D.I.Y Cutter - 材料算出 -</h1>
         <div className="topbar-actions print-hide">
+          <a
+            className="header-action-link"
+            href="#/how-to"
+            aria-label="使い方ページ"
+            title="使い方ページ"
+          >
+            使い方
+          </a>
           <button
             type="button"
             className="header-action-button"

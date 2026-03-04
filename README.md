@@ -1,5 +1,7 @@
 # DIY Cutter
 
+公開 URL: https://yamacoo4193.github.io/DIY_-Cutter/
+
 DIY Cutter は、DIY 木工で必要になる「部材整理」「必要材料の見積もり」「カット計画の把握」を 1 画面で行うための Web アプリです。  
 必要な部材を入力すると、材料規格ごとの必要本数、端材量、カット図をまとめて確認できます。
 
